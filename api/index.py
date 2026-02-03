@@ -5,47 +5,36 @@ import os
 
 app = FastAPI()
 
-# Inizializzazione client Supabase utilizzando le variabili d'ambiente di Vercel
+# Recupero variabili d'ambiente
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
-supabase = create_client(url, key)
 
 @app.get("/fleet.geojson")
 async def get_geojson():
     try:
-        # Recupera tutti i dati dalla tabella 'fleet'
+        # Verifichiamo che le chiavi esistano
+        if not url or not key:
+            return JSONResponse(content={"error": "Chiavi Supabase mancanti nei Settings di Vercel"}, status_code=500)
+        
+        # Inizializziamo il client dentro la funzione per evitare crash all'avvio
+        supabase = create_client(url, key)
         res = supabase.table("fleet").select("*").execute()
         
         features = []
         for v in res.data:
-            # Creiamo la struttura GeoJSON standard
             features.append({
                 "type": "Feature",
                 "geometry": {
                     "type": "Point", 
-                    "coordinates": [float(v["lng"]), float(v["lat"])]
+                    "coordinates": [float(v.get("lng", 0)), float(v.get("lat", 0))]
                 },
-                "properties": {
-                    "alias": v.get("alias"),
-                    "targa": v.get("targa"),
-                    "stato": v.get("stato"),
-                    "indirizzo": v.get("indirizzo"),
-                    "ultimo_aggiornamento": v.get("last_update")
-                }
+                "properties": v
             })
         
-        return JSONResponse(content={
-            "type": "FeatureCollection",
-            "features": features
-        })
+        return JSONResponse(content={"type": "FeatureCollection", "features": features})
     except Exception as e:
-        # In caso di errore (es. tabelle mancanti o chiavi errate)
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.get("/")
 async def root():
-    return {
-        "status": "online", 
-        "database_connected": url is not None,
-        "endpoint": "/fleet.geojson"
-    }
+    return {"status": "online", "config_ok": url is not None}
