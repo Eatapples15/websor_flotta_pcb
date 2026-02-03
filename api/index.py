@@ -5,19 +5,24 @@ import os
 
 app = FastAPI()
 
-# Recupero variabili d'ambiente
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
+# Leggiamo le variabili d'ambiente
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 @app.get("/fleet.geojson")
 async def get_geojson():
     try:
-        # Verifichiamo che le chiavi esistano
-        if not url or not key:
-            return JSONResponse(content={"error": "Chiavi Supabase mancanti nei Settings di Vercel"}, status_code=500)
+        # Controllo di sicurezza: se le chiavi mancano, diamo un errore chiaro invece di crashare
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            return JSONResponse(
+                content={"error": "Configurazione mancante: SUPABASE_URL o SUPABASE_KEY non trovate su Vercel."}, 
+                status_code=500
+            )
+
+        # Inizializziamo il client qui per sicurezza
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         
-        # Inizializziamo il client dentro la funzione per evitare crash all'avvio
-        supabase = create_client(url, key)
+        # Recupero dati
         res = supabase.table("fleet").select("*").execute()
         
         features = []
@@ -32,9 +37,13 @@ async def get_geojson():
             })
         
         return JSONResponse(content={"type": "FeatureCollection", "features": features})
+    
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.get("/")
 async def root():
-    return {"status": "online", "config_ok": url is not None}
+    return {
+        "status": "online", 
+        "database_env_present": SUPABASE_URL is not None and SUPABASE_KEY is not None
+    }
