@@ -2,7 +2,7 @@ import asyncio
 import os
 from playwright.async_api import async_playwright
 from supabase import create_client
-ù
+
 # Configurazione dai Secrets
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
